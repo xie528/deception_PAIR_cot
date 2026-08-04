@@ -1,0 +1,9 @@
+openai
+litellm
+fschat
+accelerate
+setuptools<81
+jailbreakbench
+pandas
+psutil
+wandb
