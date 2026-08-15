@@ -16,7 +16,15 @@ if str(PROJECT_DIR) not in sys.path:
 from experiment_profiles import PROFILES
 
 
-CONDITIONS = ("with_hidden_cot", "without_hidden_cot")
+DEFAULT_CONDITIONS = ("output_plus_cot", "output_only")
+VALID_CONDITIONS = (
+    "no_defense",
+    "cot_only",
+    "output_only",
+    "output_plus_cot",
+    "with_hidden_cot",
+    "without_hidden_cot",
+)
 
 
 def parse_args():
@@ -31,6 +39,12 @@ def parse_args():
     parser.add_argument("--run-name", default="clearharm_20_additive_ablation")
     parser.add_argument("--profile", default="pilot-strong-large")
     parser.add_argument("--job-attempts", type=int, default=3)
+    parser.add_argument(
+        "--conditions",
+        nargs=2,
+        choices=VALID_CONDITIONS,
+        default=DEFAULT_CONDITIONS,
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -50,6 +64,13 @@ def main():
         )
     if not args.dry_run and not os.getenv("OPENROUTER_API_KEY"):
         raise RuntimeError("OPENROUTER_API_KEY is not set in this terminal")
+    if (
+        not args.dry_run
+        and any(condition != "no_defense" for condition in args.conditions)
+        and not os.getenv(profile.get("cot_judge_api_key_env", "OPENAI_API_KEY"))
+    ):
+        key_name = profile.get("cot_judge_api_key_env", "OPENAI_API_KEY")
+        raise RuntimeError(f"{key_name} is not set in this terminal")
 
     run_dir = project_dir / "results" / args.run_name
     manifest = {
@@ -57,9 +78,12 @@ def main():
         "start": args.start,
         "limit": args.limit,
         "profile": args.profile,
+        "conditions": list(args.conditions),
         "comparison": {
-            "without_hidden_cot": "output gate only",
-            "with_hidden_cot": "output gate plus Hidden-CoT gate",
+            "no_defense": "same honeypot target; release first candidate without a gate",
+            "cot_only": "Hidden-CoT gate controls release and regeneration",
+            "output_only": "output gate controls release and regeneration",
+            "output_plus_cot": "both output and Hidden-CoT gates control release",
         },
         "n_streams": profile["n_streams"],
         "n_iterations": profile["n_iterations"],
@@ -88,7 +112,8 @@ def main():
     jobs = []
     for position, record in enumerate(selected):
         source_index = args.start + position
-        order = CONDITIONS if position % 2 == 0 else CONDITIONS[::-1]
+        conditions = tuple(args.conditions)
+        order = conditions if position % 2 == 0 else conditions[::-1]
         for condition in order:
             jobs.append((source_index, record, condition))
 

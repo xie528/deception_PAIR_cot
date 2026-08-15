@@ -109,7 +109,7 @@ class RationaleFirstCoTJudge:
                         }
                     ],
                     temperature=self.temperature,
-                    max_tokens=800,
+                    max_completion_tokens=800,
                     response_format={"type": "json_object"},
                 )
                 raw = completion.choices[0].message.content or ""

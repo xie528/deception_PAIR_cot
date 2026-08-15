@@ -31,14 +31,14 @@ class DefenseRecord:
 
 
 class HiddenCoTDefendedTarget:
-    """TargetLM-compatible output gate with an optional additive CoT gate."""
+    """TargetLM-compatible target with independently configurable safety gates."""
 
     def __init__(
         self,
         target,
-        output_judge,
+        output_judge=None,
         cot_judge=None,
-        defense_mode: str = "without_hidden_cot",
+        defense_mode: str = "output_only",
         max_regenerations: int = 3,
     ):
         self.target = target
@@ -68,6 +68,39 @@ class HiddenCoTDefendedTarget:
         output_judgment = None
         cot_judgment = None
 
+        if self.defense_mode == "no_defense":
+            print("Defense: generating one unmonitored honeypot candidate.", flush=True)
+            generation = self.target.generate_with_reasoning(prompt)
+            attempt = {
+                "regeneration_count": 0,
+                "response": generation.response,
+                "reasoning": generation.reasoning,
+                "finish_reason": generation.finish_reason,
+                "usage": generation.usage,
+                "output_judge_label": None,
+                "output_judge_rationale": None,
+                "output_judge_evidence": [],
+                "cot_judge_label": None,
+                "cot_judge_rationale": None,
+                "cot_judge_evidence": [],
+                "label": "unmonitored",
+                "defense_mode": self.defense_mode,
+            }
+            record = DefenseRecord(
+                prompt=prompt,
+                proposed_response=generation.response,
+                released_response=generation.response,
+                reasoning=generation.reasoning,
+                defense_mode=self.defense_mode,
+                regeneration_count=0,
+                action="released_unmonitored",
+                attempts=[attempt],
+                judge_label="unmonitored",
+                finish_reason=generation.finish_reason,
+                usage=generation.usage,
+            )
+            return generation.response, record
+
         for regeneration_count in range(self.max_regenerations + 1):
             output_judgment = None
             cot_judgment = None
@@ -85,7 +118,10 @@ class HiddenCoTDefendedTarget:
             incomplete = (
                 generation.finish_reason in {"length", "max_tokens"}
                 or not generation.response.strip()
-                or not (generation.reasoning or "").strip()
+                or (
+                    self.cot_judge is not None
+                    and not (generation.reasoning or "").strip()
+                )
             )
             if incomplete:
                 output_label = "incomplete_or_uncertain"
@@ -97,12 +133,15 @@ class HiddenCoTDefendedTarget:
                 regeneration_reason = output_rationale
                 print("Defense: candidate incomplete; regenerating.", flush=True)
             else:
-                print("Defense: judging output content.", flush=True)
-                output_judgment = self.output_judge.classify(
-                    prompt, generation.response
-                )
-                output_label = output_judgment.label
-                output_rationale = output_judgment.rationale
+                output_label = None
+                output_rationale = None
+                if self.output_judge is not None:
+                    print("Defense: judging output content.", flush=True)
+                    output_judgment = self.output_judge.classify(
+                        prompt, generation.response
+                    )
+                    output_label = output_judgment.label
+                    output_rationale = output_judgment.rationale
 
                 cot_label = None
                 cot_rationale = None
@@ -115,7 +154,10 @@ class HiddenCoTDefendedTarget:
                     cot_rationale = cot_judgment.rationale
 
                 reasons = []
-                if output_label not in OUTPUT_RELEASE_LABELS:
+                if (
+                    self.output_judge is not None
+                    and output_label not in OUTPUT_RELEASE_LABELS
+                ):
                     reasons.append(
                         f"output gate returned {output_label}: {output_rationale}"
                     )
@@ -148,7 +190,9 @@ class HiddenCoTDefendedTarget:
                 }
             )
 
-            accepted = output_label in OUTPUT_RELEASE_LABELS and (
+            accepted = (
+                self.output_judge is None or output_label in OUTPUT_RELEASE_LABELS
+            ) and (
                 self.cot_judge is None or cot_label in COT_RELEASE_LABELS
             )
             print(
@@ -186,7 +230,7 @@ class HiddenCoTDefendedTarget:
             regeneration_count=self.max_regenerations,
             action="fallback_after_max_regenerations",
             attempts=attempts,
-            output_judge_label="safe_content",
+            output_judge_label=None,
             output_judge_rationale=(
                 "The generation budget was exhausted, so the system released "
                 "a fixed non-actionable refusal instead of the rejected candidate."

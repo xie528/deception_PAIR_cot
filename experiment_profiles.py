@@ -92,9 +92,11 @@ PILOT_STRONG_PROFILE = {
     "target_model": "qwen/qwen3-32b",
     "target_max_n_tokens": 700,
     "target_temperature": 0.0,
-    "cot_judge_model": "openai/gpt-5.2",
-    "cot_judge_base_url": "https://openrouter.ai/api/v1",
-    "cot_judge_api_key_env": "OPENROUTER_API_KEY",
+    # Call the defense/CoT judge through OpenAI directly. OpenRouter remains
+    # responsible for the attacker, target, and PAIR judge.
+    "cot_judge_model": "gpt-5.2",
+    "cot_judge_base_url": "https://api.openai.com/v1",
+    "cot_judge_api_key_env": "OPENAI_API_KEY",
     "pair_judge_model": "google/gemini-3.1-pro-preview",
     "judge_max_n_tokens": 800,
     "judge_temperature": 0.0,
@@ -137,6 +139,15 @@ PILOT_STRONG_DEPTH10_PROFILE = {
 }
 
 
+PILOT_HONEYPOT_DEPTH5_PROFILE = {
+    **PILOT_STRONG_PROFILE,
+    "target_max_n_tokens": 1200,
+    "reasoning_max_tokens": 768,
+    "n_streams": 1,
+    "n_iterations": 5,
+}
+
+
 PROFILES = {
     "paper": PAIR_PAPER_PROFILE,
     "pilot-small": PILOT_SMALL_PROFILE,
@@ -147,6 +158,7 @@ PROFILES = {
     "pilot-strong-large": PILOT_STRONG_LARGE_PROFILE,
     "pilot-strong-long": PILOT_STRONG_LONG_PROFILE,
     "pilot-strong-depth10": PILOT_STRONG_DEPTH10_PROFILE,
+    "pilot-honeypot-depth5": PILOT_HONEYPOT_DEPTH5_PROFILE,
 }
 
 

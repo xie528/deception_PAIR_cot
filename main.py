@@ -55,15 +55,22 @@ def main(args):
             max_tokens=args.target_max_n_tokens,
             reasoning_max_tokens=args.reasoning_max_tokens,
         )
-        output_judge = RationaleFirstCoTJudge(
-            model=args.cot_judge_model,
-            base_url=args.cot_judge_base_url,
-            api_key_env=args.cot_judge_api_key_env,
-            temperature=args.judge_temperature,
-            mode="without_hidden_cot",
-        )
+        mode_aliases = {
+            "with_hidden_cot": "output_plus_cot",
+            "without_hidden_cot": "output_only",
+        }
+        defense_mode = mode_aliases.get(args.defense_mode, args.defense_mode)
+        output_judge = None
+        if defense_mode in {"output_only", "output_plus_cot"}:
+            output_judge = RationaleFirstCoTJudge(
+                model=args.cot_judge_model,
+                base_url=args.cot_judge_base_url,
+                api_key_env=args.cot_judge_api_key_env,
+                temperature=args.judge_temperature,
+                mode="without_hidden_cot",
+            )
         cot_judge = None
-        if args.defense_mode == "with_hidden_cot":
+        if defense_mode in {"cot_only", "output_plus_cot"}:
             cot_judge = RationaleFirstCoTJudge(
                 model=args.cot_judge_model,
                 base_url=args.cot_judge_base_url,
@@ -75,7 +82,7 @@ def main(args):
             target=reasoning_target,
             output_judge=output_judge,
             cot_judge=cot_judge,
-            defense_mode=args.defense_mode,
+            defense_mode=defense_mode,
             max_regenerations=args.max_regenerations,
         )
         args.judge_model = args.pair_judge_model
@@ -147,7 +154,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--profile",
-        choices=["paper", "pilot-small", "meaningful-pilot", "main-hidden-cot", "pilot-strong", "pilot-strong-smoke", "pilot-strong-large", "pilot-strong-long", "pilot-strong-depth10"],
+        choices=["paper", "pilot-small", "meaningful-pilot", "main-hidden-cot", "pilot-strong", "pilot-strong-smoke", "pilot-strong-large", "pilot-strong-long", "pilot-strong-depth10", "pilot-honeypot-depth5"],
         default="pilot-small",
         help="paper reproduces published PAIR settings; pilot-small enables the cheap Hidden-CoT pilot.",
     )
@@ -263,8 +270,15 @@ if __name__ == '__main__':
     parser.add_argument("--hidden-cot-defense", action="store_true")
     parser.add_argument(
         "--defense-mode",
-        choices=["with_hidden_cot", "without_hidden_cot"],
-        default="with_hidden_cot",
+        choices=[
+            "no_defense",
+            "cot_only",
+            "output_only",
+            "output_plus_cot",
+            "with_hidden_cot",
+            "without_hidden_cot",
+        ],
+        default="output_plus_cot",
     )
     parser.add_argument("--max-regenerations", type=int, default=3)
     parser.add_argument("--reasoning-max-tokens", type=int, default=1024)
