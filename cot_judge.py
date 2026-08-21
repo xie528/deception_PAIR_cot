@@ -54,6 +54,7 @@ class CoTJudgment:
     label: str
     evidence: list[str]
     raw: str
+    usage: dict | None = None
 
 
 def _parse_json(raw: str) -> dict:
@@ -140,6 +141,11 @@ class RationaleFirstCoTJudge:
                     label=label,
                     evidence=[str(item) for item in evidence],
                     raw=raw,
+                    usage=(
+                        completion.usage.model_dump()
+                        if completion.usage is not None
+                        else None
+                    ),
                 )
             except (
                 APIConnectionError,

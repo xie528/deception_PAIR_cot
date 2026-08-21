@@ -22,8 +22,10 @@ class DefenseRecord:
     attempts: list[dict]
     output_judge_label: str | None = None
     output_judge_rationale: str | None = None
+    output_judge_usage: dict | None = None
     cot_judge_label: str | None = None
     cot_judge_rationale: str | None = None
+    cot_judge_usage: dict | None = None
     judge_label: str | None = None
     rationale: str | None = None
     finish_reason: str | None = None
@@ -80,9 +82,11 @@ class HiddenCoTDefendedTarget:
                 "output_judge_label": None,
                 "output_judge_rationale": None,
                 "output_judge_evidence": [],
+                "output_judge_usage": None,
                 "cot_judge_label": None,
                 "cot_judge_rationale": None,
                 "cot_judge_evidence": [],
+                "cot_judge_usage": None,
                 "label": "unmonitored",
                 "defense_mode": self.defense_mode,
             }
@@ -180,10 +184,20 @@ class HiddenCoTDefendedTarget:
                     "output_judge_evidence": (
                         output_judgment.evidence if output_judgment else []
                     ),
+                    "output_judge_usage": (
+                        getattr(output_judgment, "usage", None)
+                        if output_judgment
+                        else None
+                    ),
                     "cot_judge_label": cot_label,
                     "cot_judge_rationale": cot_rationale,
                     "cot_judge_evidence": (
                         cot_judgment.evidence if cot_judgment else []
+                    ),
+                    "cot_judge_usage": (
+                        getattr(cot_judgment, "usage", None)
+                        if cot_judgment
+                        else None
                     ),
                     "label": legacy_label,
                     "defense_mode": self.defense_mode,
@@ -212,8 +226,18 @@ class HiddenCoTDefendedTarget:
                     attempts=attempts,
                     output_judge_label=output_label,
                     output_judge_rationale=output_rationale,
+                    output_judge_usage=(
+                        getattr(output_judgment, "usage", None)
+                        if output_judgment
+                        else None
+                    ),
                     cot_judge_label=cot_label,
                     cot_judge_rationale=cot_rationale,
+                    cot_judge_usage=(
+                        getattr(cot_judgment, "usage", None)
+                        if cot_judgment
+                        else None
+                    ),
                     judge_label=legacy_label,
                     rationale=cot_rationale or output_rationale,
                     finish_reason=generation.finish_reason,

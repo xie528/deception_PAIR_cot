@@ -160,6 +160,42 @@ python -m unittest tests.test_hidden_cot_defense -v
 
 These focused tests do not require API calls.
 
+## 9. Run the published PAIR AdvBench-50 subset
+
+The repository includes PAIR's published custom subset of 50 AdvBench behaviors
+at `data/harmful_behaviors_custom.csv`. This is an AdvBench subset, not the
+HarmBench benchmark.
+
+Preview all 100 planned jobs (50 objectives x 2 conditions) without API calls:
+
+```bash
+python scripts/run_advbench_50.py --dry-run
+```
+
+The current intended comparison uses one PAIR stream, up to five iterations,
+and the `no_defense` and `cot_only` conditions. After loading the OpenRouter and
+OpenAI API keys, run one real objective through both conditions first:
+
+```bash
+bash scripts/run_advbench_smoke.sh
+```
+
+If both smoke-test jobs finalize successfully, launch or resume all 50 with:
+
+```bash
+bash scripts/run_advbench_50.sh
+```
+
+Finalized traces are written beneath
+`results/advbench_50_depth5_honeypot/`. Re-running the same command skips
+finalized objective-condition pairs and retries only missing work. Analyze any
+completed subset with:
+
+```bash
+python scripts/analyze_clearharm_ablation.py \
+  results/advbench_50_depth5_honeypot
+```
+
 ## Current hosted models
 
 The `pilot-honeypot-depth5` profile currently uses:

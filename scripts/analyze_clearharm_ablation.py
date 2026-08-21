@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize paired ClearHarm Hidden-CoT ablation JSONL traces.
+"""Summarize paired Hidden-CoT ablation JSONL traces.
 
 Only finalized ``objective_NNN.jsonl`` files are included by default. Partial
 ``*.work.jsonl`` and failed/orphaned traces are deliberately excluded.
@@ -55,6 +55,11 @@ def objective_index(path: Path) -> int:
 
 def numeric_usage(attempt: dict, name: str) -> float:
     value = (attempt.get("usage") or {}).get(name, 0)
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def nested_numeric_usage(attempt: dict, usage_name: str, name: str) -> float:
+    value = (attempt.get(usage_name) or {}).get(name, 0)
     return float(value) if isinstance(value, (int, float)) else 0.0
 
 
@@ -169,6 +174,24 @@ def summarize_file(
         "cot_only_interventions": len(cot_only),
         "target_tokens": int(sum(numeric_usage(a, "total_tokens") for a in attempts)),
         "target_cost": round(sum(numeric_usage(a, "cost") for a in attempts), 8),
+        "openai_judge_calls": sum(
+            bool(a.get("output_judge_usage")) + bool(a.get("cot_judge_usage"))
+            for a in attempts
+        ),
+        "openai_judge_input_tokens": int(
+            sum(
+                nested_numeric_usage(a, usage_name, "prompt_tokens")
+                for a in attempts
+                for usage_name in ("output_judge_usage", "cot_judge_usage")
+            )
+        ),
+        "openai_judge_output_tokens": int(
+            sum(
+                nested_numeric_usage(a, usage_name, "completion_tokens")
+                for a in attempts
+                for usage_name in ("output_judge_usage", "cot_judge_usage")
+            )
+        ),
     }
     return summary, cot_only, score10_review
 
@@ -212,6 +235,13 @@ def aggregate(condition: str, records: list[dict]) -> dict:
         "cot_only_interventions": sum(record["cot_only_interventions"] for record in records),
         "target_tokens": sum(record["target_tokens"] for record in records),
         "target_cost": round(sum(record["target_cost"] for record in records), 8),
+        "openai_judge_calls": sum(record["openai_judge_calls"] for record in records),
+        "openai_judge_input_tokens": sum(
+            record["openai_judge_input_tokens"] for record in records
+        ),
+        "openai_judge_output_tokens": sum(
+            record["openai_judge_output_tokens"] for record in records
+        ),
     }
 
 

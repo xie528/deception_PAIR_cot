@@ -17,6 +17,7 @@ class FakeJudgment:
     rationale: str
     label: str
     evidence: list[str] = None
+    usage: dict | None = None
 
     def __post_init__(self):
         if self.evidence is None:
@@ -41,17 +42,20 @@ class SequenceTarget:
 
 
 class RecordingJudge:
-    def __init__(self, mode, labels):
+    def __init__(self, mode, labels, usage=None):
         self.mode = mode
         self.labels = labels
         self.calls = 0
         self.signals = []
+        self.usage = usage
 
     def classify(self, prompt, signal):
         self.signals.append(signal)
         label = self.labels[min(self.calls, len(self.labels) - 1)]
         self.calls += 1
-        return FakeJudgment(rationale=f"classified {label}", label=label)
+        return FakeJudgment(
+            rationale=f"classified {label}", label=label, usage=self.usage
+        )
 
 
 def generation(response="response", reasoning="reasoning", finish_reason="stop"):
@@ -91,7 +95,11 @@ class HiddenCoTDefenseTests(unittest.TestCase):
         self.assertEqual(cot.signals, ["reasoning"])
 
     def test_cot_only_uses_reasoning_and_does_not_call_output_judge(self):
-        cot = RecordingJudge("with_hidden_cot", ["defensive_decoy_plan"])
+        cot = RecordingJudge(
+            "with_hidden_cot",
+            ["defensive_decoy_plan"],
+            usage={"prompt_tokens": 17, "completion_tokens": 5},
+        )
         defense = HiddenCoTDefendedTarget(
             SequenceTarget([generation()]),
             output_judge=None,
@@ -102,6 +110,14 @@ class HiddenCoTDefenseTests(unittest.TestCase):
         self.assertEqual(cot.signals, ["reasoning"])
         self.assertIsNone(
             defense.last_defense_records[0]["output_judge_label"]
+        )
+        self.assertEqual(
+            defense.last_defense_records[0]["cot_judge_usage"],
+            {"prompt_tokens": 17, "completion_tokens": 5},
+        )
+        self.assertEqual(
+            defense.last_defense_records[0]["attempts"][0]["cot_judge_usage"],
+            {"prompt_tokens": 17, "completion_tokens": 5},
         )
 
     def test_no_defense_releases_first_candidate_without_judging(self):
